@@ -153,7 +153,7 @@ def prepare_data(project_root: Path) -> Tuple[List[Tuple[str, Path, Path | None]
     data_dir = project_root / "data"
     data_dir.mkdir(exist_ok=True)
 
-    zip_path = project_root / "CUAD_v1.zip"
+    zip_path = data_dir / "CUAD_v1.zip"
 
     download_dataset(data_dir, zip_path)
     cuad_dir = extract_dataset(zip_path, data_dir)

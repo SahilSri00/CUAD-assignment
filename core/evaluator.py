@@ -95,13 +95,13 @@ def evaluate_extractions(
 
             # Find matching row in ground truth
             gt_rows = ground_truth[
-                ground_truth["Filename"].str.contains(
-                    contract_id[:50], case=False, na=False, regex=False
+                ground_truth["Filename"].str.lower().str.contains(
+                    contract_id.lower()[:60], na=False, regex=False
                 )
             ]
 
             if gt_rows.empty:
-                logger.debug("No ground truth found for %s", contract_id)
+                logger.warning("No ground truth match for contract_id: %s", contract_id)
                 continue
 
             gt_row = gt_rows.iloc[0]

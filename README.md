@@ -77,7 +77,7 @@ flowchart TD
 ```bash
 # Clone the repository
 git clone <repository-url>
-cd contract-analysis-pipeline
+cd CUAD-assignment
 
 # Install dependencies
 pip install -r requirements.txt

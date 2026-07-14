@@ -19,8 +19,8 @@ import openai
 logger = logging.getLogger(__name__)
 
 DEFAULT_MODEL = "llama-3.3-70b-versatile"
-MAX_RETRIES = 3
-RETRY_DELAY = 2  # seconds
+MAX_RETRIES = 6
+RETRY_DELAY = 15  # seconds (Groq free tier needs longer cooldowns)
 
 # --- Few-Shot Examples for Clause Extraction (Bonus) ---
 
@@ -315,14 +315,15 @@ def _call_llm(
             return _extract_json(content)
 
         except openai.RateLimitError:
-            wait = RETRY_DELAY * (2 ** attempt)
+            wait = RETRY_DELAY * (2 ** attempt)  # 15, 30, 60, 120, 240, 480s
             logger.warning("Rate limit hit. Retrying in %ds... (attempt %d/%d)", wait, attempt + 1, MAX_RETRIES)
             time.sleep(wait)
 
         except openai.APIError as e:
             logger.error("API error: %s", e)
             if attempt < MAX_RETRIES - 1:
-                time.sleep(RETRY_DELAY)
+                wait = RETRY_DELAY * (2 ** attempt)
+                time.sleep(wait)
             else:
                 raise
 
@@ -452,6 +453,9 @@ def process_contract(
 
     # Extract clauses
     clauses = extract_clauses(full_text, chunks, model=model)
+
+    # Brief cooldown to avoid hitting rate limits between extraction and summary
+    time.sleep(5)
 
     # Generate summary
     summary = summarize_contract(full_text, chunks, model=model)

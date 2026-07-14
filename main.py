@@ -166,6 +166,12 @@ def run_search(args: argparse.Namespace) -> None:
     """Run semantic search over previously extracted clauses."""
     logger = logging.getLogger("search")
 
+    if not OUTPUT_DIR.exists():
+        logger.error(
+            "Output directory not found. Run the pipeline first: python main.py"
+        )
+        sys.exit(1)
+
     try:
         metadata, tfidf_matrix, idf, vocab = load_index(OUTPUT_DIR)
     except FileNotFoundError:

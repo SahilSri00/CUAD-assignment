@@ -1,0 +1,16 @@
+{
+  "total_contracts": 2,
+  "clause_metrics": {
+    "termination_clause": {
+      "avg_jaccard_similarity": 0.1402,
+      "detection_accuracy": 1.0,
+      "contracts_evaluated": 2
+    },
+    "liability_clause": {
+      "avg_jaccard_similarity": 0.7212,
+      "detection_accuracy": 1.0,
+      "contracts_evaluated": 2
+    }
+  },
+  "overall_detection_accuracy": 1.0
+}
