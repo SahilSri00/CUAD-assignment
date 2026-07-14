@@ -1,6 +1,6 @@
 # Legal Contract Analysis Pipeline
 
-An LLM-powered pipeline that analyzes legal contracts from the [CUAD dataset](https://www.atticusprojectai.org/cuad), extracts key clauses (Termination, Confidentiality, Liability), and generates concise summaries.
+An LLM-powered pipeline that analyzes legal contracts from the [CUAD dataset](https://www.atticusprojectai.org/cuad), extracts key clauses (Termination, Confidentiality, Liability), and generates concise summaries using Groq's blazing-fast LLM inference.
 
 ## Architecture & Flow Diagram
 
@@ -70,7 +70,7 @@ flowchart TD
 
 ### Prerequisites
 - Python 3.9+
-- An OpenAI API key
+- A Groq API key (free at [console.groq.com](https://console.groq.com)) or an OpenAI API key
 
 ### Installation
 
@@ -82,10 +82,13 @@ cd contract-analysis-pipeline
 # Install dependencies
 pip install -r requirements.txt
 
-# Set your OpenAI API key
-export OPENAI_API_KEY="your-api-key-here"
+# Set your Groq API key (recommended — free and fast)
+export GROQ_API_KEY="your-groq-api-key-here"
 # On Windows:
-set OPENAI_API_KEY=your-api-key-here
+set GROQ_API_KEY=your-groq-api-key-here
+
+# OR use OpenAI instead:
+# export OPENAI_API_KEY="your-openai-key-here"
 ```
 
 ## Usage
@@ -99,8 +102,8 @@ python main.py
 # Process a smaller subset for testing
 python main.py --contracts 10
 
-# Use a different model
-python main.py --model gpt-4o
+# Use OpenAI models instead of Groq
+python main.py --model gpt-4o-mini
 
 # Enable verbose logging
 python main.py --verbose
@@ -132,7 +135,7 @@ python main.py --search "non-disclosure of confidential information"
 ### 3. Prompt Engineering
 - **Clause Extraction**: Uses a structured system prompt defining the three clause types with clear descriptions. Includes **two few-shot examples** (one with all three clauses present, one with a missing confidentiality clause) to calibrate the model's extraction behavior. Outputs structured JSON via `response_format={"type": "json_object"}`.
 - **Summarization**: Separate prompt with explicit 100–150 word constraint, covering purpose, obligations, and risks. Includes a programmatic word-count validation with automatic retry if outside the target range.
-- **Model**: Uses `gpt-4o-mini` by default for its strong performance-to-cost ratio. Configurable via `--model` flag.
+- **Model**: Uses `llama-3.3-70b-versatile` on Groq by default for its excellent performance and free tier availability. Also supports OpenAI models via `--model gpt-4o-mini` flag. The pipeline auto-detects which API key is set (`GROQ_API_KEY` or `OPENAI_API_KEY`).
 
 ### 4. Evaluation
 - Compares LLM-extracted Termination and Liability clauses against CUAD's human annotations using:
@@ -141,8 +144,8 @@ python main.py --search "non-disclosure of confidential information"
 - Confidentiality clauses are not evaluated against ground truth since CUAD does not contain a dedicated Confidentiality category.
 
 ### 5. Semantic Search (Bonus)
-- All extracted clauses and summaries are embedded using OpenAI's `text-embedding-3-small` model.
-- Search queries are embedded and compared via cosine similarity.
+- All extracted clauses and summaries are vectorized using a lightweight TF-IDF approach (no external API required).
+- Search queries are vectorized and compared via cosine similarity.
 - The index is persisted to disk for fast reuse.
 
 ## Output Format
@@ -178,13 +181,14 @@ Same structure as CSV, formatted as a list of objects.
     ├── contracts_analysis.json
     ├── evaluation_metrics.json
     ├── search_metadata.json
-    └── search_embeddings.npy
+    ├── search_tfidf.npy
+    └── search_vocab.json
 ```
 
 ## Limitations & Future Work
 - **Confidentiality evaluation**: CUAD lacks a dedicated Confidentiality category, so ground-truth evaluation is limited to Termination and Liability clauses.
 - **PDF quality**: Some CUAD PDFs have OCR artifacts or complex table layouts that may affect extraction quality.
-- **Model comparison**: The pipeline supports swapping models via `--model` flag (e.g., `gpt-4o` vs `gpt-4o-mini`) for comparative analysis.
+- **Model comparison**: The pipeline supports swapping models via `--model` flag (e.g., `gpt-4o-mini` vs `llama-3.3-70b-versatile`) for comparative analysis.
 - **Scalability**: For production use, consider async API calls, caching, and a vector database (e.g., FAISS, Pinecone) for the search index.
 
 ## License

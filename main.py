@@ -7,7 +7,7 @@ Usage:
     python main.py                          # Run full pipeline
     python main.py --search "query text"    # Semantic search over clauses
     python main.py --contracts 20           # Process 20 contracts instead of 50
-    python main.py --model gpt-4o           # Use a different model
+    python main.py --model gpt-4o-mini      # Use a different model
 """
 
 import argparse
@@ -145,8 +145,8 @@ def run_pipeline(args: argparse.Namespace) -> None:
     logger.info("STEP 6/6: Building semantic search index...")
     logger.info("=" * 60)
     try:
-        metadata, embeddings = build_search_index(results)
-        save_index(metadata, embeddings, OUTPUT_DIR)
+        metadata, tfidf_matrix, idf, vocab = build_search_index(results)
+        save_index(metadata, tfidf_matrix, idf, vocab, OUTPUT_DIR)
         logger.info("Search index saved. Use --search to query.")
     except Exception as e:
         logger.error("Search index creation failed: %s", e)
@@ -167,7 +167,7 @@ def run_search(args: argparse.Namespace) -> None:
     logger = logging.getLogger("search")
 
     try:
-        metadata, embeddings = load_index(OUTPUT_DIR)
+        metadata, tfidf_matrix, idf, vocab = load_index(OUTPUT_DIR)
     except FileNotFoundError:
         logger.error(
             "Search index not found. Run the pipeline first: python main.py"
@@ -177,7 +177,7 @@ def run_search(args: argparse.Namespace) -> None:
     query = args.search
     logger.info("Searching for: '%s'", query)
 
-    results = search(query, metadata, embeddings, top_k=5)
+    results = search(query, metadata, tfidf_matrix, idf, vocab, top_k=5)
 
     print(f"\n{'=' * 70}")
     print(f"  Search Results for: \"{query}\"")
@@ -226,8 +226,8 @@ def main() -> None:
     parser.add_argument(
         "--model",
         type=str,
-        default="gpt-4o-mini",
-        help="OpenAI model to use (default: gpt-4o-mini).",
+        default="llama-3.3-70b-versatile",
+        help="LLM model to use (default: llama-3.3-70b-versatile for Groq).",
     )
     parser.add_argument(
         "--verbose",

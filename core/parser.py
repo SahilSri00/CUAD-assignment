@@ -13,8 +13,9 @@ import fitz  # PyMuPDF
 
 logger = logging.getLogger(__name__)
 
-# Approximate token limit for gpt-4o-mini (leave headroom for prompts)
-MAX_CHUNK_CHARS = 40_000  # ~10K tokens
+# Approximate token limit — keep chunks small enough for Groq free tier
+# (12K TPM limit minus ~3K tokens for system prompt + few-shot examples)
+MAX_CHUNK_CHARS = 20_000  # ~5K tokens per chunk
 CHUNK_OVERLAP_CHARS = 2_000  # ~500 tokens overlap
 
 

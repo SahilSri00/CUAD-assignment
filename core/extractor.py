@@ -1,11 +1,15 @@
 """LLM-powered clause extraction and contract summarization.
 
-Uses OpenAI's GPT models to extract key legal clauses (Termination,
-Confidentiality, Liability) and generate concise contract summaries.
-Implements few-shot prompting for improved extraction quality.
+Uses Groq's LLM API (OpenAI-compatible) to extract key legal clauses
+(Termination, Confidentiality, Liability) and generate concise contract
+summaries. Implements few-shot prompting for improved extraction quality.
+
+Supported providers: Groq (default), OpenAI (via --model flag).
 """
 
 import json
+import os
+import re
 import time
 import logging
 from typing import Dict, List, Optional
@@ -14,7 +18,7 @@ import openai
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_MODEL = "gpt-4o-mini"
+DEFAULT_MODEL = "llama-3.3-70b-versatile"
 MAX_RETRIES = 3
 RETRY_DELAY = 2  # seconds
 
@@ -211,12 +215,78 @@ def _build_merge_prompt(chunk_results: List[Dict]) -> List[Dict[str, str]]:
     return messages
 
 
+def _get_client() -> openai.OpenAI:
+    """Create an LLM client, auto-detecting Groq or OpenAI from env vars.
+
+    Checks for GROQ_API_KEY first (uses Groq endpoint), then falls back
+    to OPENAI_API_KEY (uses OpenAI endpoint).
+
+    Returns:
+        Configured OpenAI-compatible client.
+    """
+    groq_key = os.environ.get("GROQ_API_KEY")
+    openai_key = os.environ.get("OPENAI_API_KEY")
+
+    if groq_key:
+        logger.info("Using Groq API (llama models via api.groq.com)")
+        return openai.OpenAI(
+            api_key=groq_key,
+            base_url="https://api.groq.com/openai/v1",
+        )
+    elif openai_key:
+        logger.info("Using OpenAI API")
+        return openai.OpenAI(api_key=openai_key)
+    else:
+        raise RuntimeError(
+            "No API key found. Set GROQ_API_KEY or OPENAI_API_KEY environment variable."
+        )
+
+
+def _extract_json(text: str) -> Dict:
+    """Extract JSON object from LLM response text.
+
+    Handles cases where the model wraps JSON in markdown code blocks
+    or includes extra text around it.
+
+    Args:
+        text: Raw LLM response text.
+
+    Returns:
+        Parsed JSON dictionary.
+    """
+    # Try direct parse first
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Try extracting from markdown code block
+    match = re.search(r"```(?:json)?\s*\n?(\{.*?\})\s*```", text, re.DOTALL)
+    if match:
+        try:
+            return json.loads(match.group(1))
+        except json.JSONDecodeError:
+            pass
+
+    # Try finding first { to last }
+    start = text.find("{")
+    end = text.rfind("}")
+    if start != -1 and end != -1 and end > start:
+        try:
+            return json.loads(text[start:end + 1])
+        except json.JSONDecodeError:
+            pass
+
+    raise json.JSONDecodeError("Could not extract JSON from response", text, 0)
+
+
 def _call_llm(
     messages: List[Dict[str, str]],
     model: str = DEFAULT_MODEL,
     temperature: float = 0.0,
 ) -> Dict:
-    """Call the OpenAI API with retry logic.
+    """Call the LLM API (Groq or OpenAI) with retry logic.
 
     Args:
         messages: List of message dicts.
@@ -226,18 +296,23 @@ def _call_llm(
     Returns:
         Parsed JSON response as a dictionary.
     """
-    client = openai.OpenAI()
+    client = _get_client()
 
     for attempt in range(MAX_RETRIES):
         try:
-            response = client.chat.completions.create(
-                model=model,
-                messages=messages,
-                temperature=temperature,
-                response_format={"type": "json_object"},
-            )
+            # Build kwargs — use json mode if the model supports it
+            kwargs = {
+                "model": model,
+                "messages": messages,
+                "temperature": temperature,
+            }
+            # Groq's llama models support json mode
+            if "llama" in model.lower() or "gpt" in model.lower():
+                kwargs["response_format"] = {"type": "json_object"}
+
+            response = client.chat.completions.create(**kwargs)
             content = response.choices[0].message.content
-            return json.loads(content)
+            return _extract_json(content)
 
         except openai.RateLimitError:
             wait = RETRY_DELAY * (2 ** attempt)
